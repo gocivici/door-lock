@@ -12,6 +12,8 @@
 
   Written by Limor Fried/Ladyada for Adafruit Industries.  
   BSD license, all text above must be included in any redistribution
+
+  Edited by Görkem Bozkurt
  ****************************************************/
 
 #include <Servo.h>
@@ -21,7 +23,10 @@ Servo myservo;
 int getFingerprintIDez();
 boolean lock = false;
 int pos = 0;
-
+int buzzer = 6;
+int buttonPin = 7;
+int magnet = 4;
+boolean doorStatus = false;
 // pin #2 is IN from sensor (GREEN wire)
 // pin #3 is OUT from arduino  (WHITE wire)
 SoftwareSerial mySerial(2, 3);
@@ -32,9 +37,11 @@ Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
 void setup()  
 {
-  myservo.attach(5);
-  while (!Serial);  // For Yun/Leo/Micro/Zero/...
   
+  while (!Serial);  // For Yun/Leo/Micro/Zero/...
+  pinMode(buzzer, OUTPUT);
+  pinMode(buttonPin, INPUT);
+  pinMode(magnet,INPUT);
   Serial.begin(9600);
   Serial.println("finger detect test");
 
@@ -50,15 +57,31 @@ void setup()
   Serial.println("Waiting for valid finger...");
 }
 
-void loop()                     // run over and over again
-{
-  myservo.write(20);
+void loop(){
+//Serial.println(digitalRead(magnet));// test for magnet readings.
+
+  if(doorStatus){
+    if(digitalRead(magnet)==LOW){
+      delay(1000);
+      
+      sweepc();//rotate servo from 20 to 180 degrees.
+      doorStatus=false;
+    }else{
+      sweepcc();//rotate servo from 180 to 20 degrees.
+      }
+  }
   
-  if(getFingerprintIDez()>=0){
-    sweep();
+  if(getFingerprintIDez()>=0||digitalRead(buttonPin)==LOW){
+    digitalWrite(buzzer, HIGH);
+    delay(200);
+    digitalWrite(buzzer, LOW);
+    doorStatus=true;
+    
+    sweepcc();
+    
     delay(1000);
     }
-  delay(50);            //don't ned to run this at full speed.
+  delay(50);            //don't need to run this at full speed.
 }
 
 uint8_t getFingerprintID() {
@@ -142,10 +165,26 @@ int getFingerprintIDez() {
   Serial.print(" with confidence of "); Serial.println(finger.confidence);
   return finger.fingerID; 
 }
-void sweep(){
-  for (pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
+void sweepc(){
+  if(lock==false){
+  myservo.attach(5);
+  for (pos = 20; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
     // in steps of 1 degree
     myservo.write(pos);              // tell servo to go to position in variable 'pos'
     delay(15);                       // waits 15ms for the servo to reach the position
   }
+  lock=true;
+  myservo.detach();
   }
+  }
+ void sweepcc(){
+ if(lock){
+  myservo.attach(5);
+ for (pos = 180; pos >= 20; pos -= 1) { // goes from 180 degrees to 20 degrees
+    myservo.write(pos);              // tell servo to go to position in variable 'pos'
+    delay(15);
+ }
+ lock = false;
+ myservo.detach();
+ }
+ }
